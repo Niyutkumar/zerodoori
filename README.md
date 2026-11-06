@@ -1,7 +1,7 @@
 # ZeroDoori
 
 **Watch YouTube together, at zero distance.**
-ZeroDoori keeps a YouTube video in sync between you and friends anywhere: when one person plays, pauses, skips or changes the video, it happens for everyone. There's a chat too.
+ZeroDoori keeps a YouTube video in sync between you and friends anywhere: when one person plays, pauses, skips or changes the video, it happens for everyone. There's a shared **Up next** queue, a chat, and light and dark modes.
 
 - **Website:** https://zerodoori.onrender.com
 - **Android app:** https://github.com/Niyutkumar/zerodoori/releases/latest/download/ZeroDoori.apk
@@ -17,6 +17,8 @@ Everything runs on free plans (Render + GitHub). No ads, no accounts, no cost.
 3. Your friend opens the link (website or app), types their name and taps **Join room**.
 4. Paste any YouTube link and tap **Play**. It starts for both of you.
 5. Use the normal YouTube controls: play, pause, drag the progress bar, change speed. Your friend follows along.
+6. To line up more videos, paste a link and tap **Queue**. They play one after another for everyone. Open the **Up next** tab to play one now (▶), move it to the top (↑), or remove it (✕). **Next** skips to the first video in the queue.
+7. The sun / moon button switches between light and dark mode. Until you choose, ZeroDoori follows your phone's setting.
 
 The room code (like `7KQ2MX`) works too: your friend can type it under "or join a friend".
 
@@ -65,7 +67,8 @@ If installing a newer APK fails with "App not installed", uninstall the old Zero
 
 | Path | What it is |
 |---|---|
-| `server.js` | Express + Socket.IO server: rooms, sync state, chat, clock sync |
+| `server.js` | Express + Socket.IO server: rooms, sync state, queue, chat, clock sync |
+| `youtube.js` | Looks up video titles (no key needed) and YouTube search (ready, switched off until a key is added) |
 | `public/` | The website: `index.html`, `style.css`, `app.js`, icons, web-app manifest |
 | `mobile/` | Android app (Capacitor). `capacitor.config.json` points it at the website |
 | `mobile/android/.../MainActivity.java` | Adds proper full-screen video, Back to exit full screen, keeps the screen on |
@@ -86,6 +89,14 @@ npx playwright install chromium && npm run test:e2e   # full sync tests in real 
 ```
 
 Open http://localhost:3000 in two browser windows to try a room with yourself.
+
+## Turning on search later
+
+The server already has YouTube search built in (`/api/search`), switched off until it has a key:
+
+1. In Google Cloud, create a project, enable **YouTube Data API v3**, and create an **API key** (free, about 100 searches a day, no billing needed).
+2. In Render → zerodoori → Environment, add `YOUTUBE_API_KEY` with that key and save.
+3. Add a search box to the page that calls `/api/search?q=…`.
 
 ## Updating
 

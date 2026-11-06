@@ -179,3 +179,155 @@ test('clock sync answers with server time', async () => {
   assert.ok(Math.abs(t - Date.now()) < 1000);
   a.close();
 });
+
+// ---------------------------------------------------------------------------
+// Queue
+// ---------------------------------------------------------------------------
+function queueAdd(socket, item) {
+  return new Promise((resolve) => socket.emit('queue:add', item, resolve));
+}
+
+test('queue: first add starts playing, later adds wait in line', async () => {
+  const a = client();
+  const b = client();
+  await join(a, 'QUEUE1', 'A');
+  await join(b, 'QUEUE1', 'B');
+
+  let started = stateFor(b, 'load');
+  let res = await queueAdd(a, { videoId: 'aaaaaaaaaaa', title: 'First song' });
+  assert.equal(res.started, true);
+  let s = await started;
+  assert.equal(s.videoId, 'aaaaaaaaaaa');
+  assert.equal(s.title, 'First song');
+
+  let q = once(b, 'queue');
+  res = await queueAdd(b, { videoId: 'bbbbbbbbbbb', title: 'Second song', channel: 'Chan', duration: 215 });
+  assert.equal(res.started, false);
+  let list = await q;
+  assert.equal(list.length, 1);
+  assert.equal(list[0].title, 'Second song');
+  assert.equal(list[0].addedBy, 'B');
+  assert.equal(list[0].duration, 215);
+
+  q = once(a, 'queue');
+  await queueAdd(a, { videoId: 'ccccccccccc', title: 'Third song' });
+  list = await q;
+  assert.deepEqual(list.map((i) => i.videoId), ['bbbbbbbbbbb', 'ccccccccccc']);
+
+  // Move the third to the top
+  q = once(a, 'queue');
+  b.emit('queue:top', { itemId: list[1].id });
+  list = await q;
+  assert.deepEqual(list.map((i) => i.videoId), ['ccccccccccc', 'bbbbbbbbbbb']);
+
+  // Skip -> plays the top item
+  started = stateFor(a, 'next');
+  q = once(a, 'queue');
+  b.emit('control', { action: 'next' });
+  s = await started;
+  list = await q;
+  assert.equal(s.videoId, 'ccccccccccc');
+  assert.equal(s.isPlaying, true);
+  assert.equal(s.position, 0);
+  assert.deepEqual(list.map((i) => i.videoId), ['bbbbbbbbbbb']);
+
+  // Remove the last one
+  q = once(a, 'queue');
+  a.emit('queue:remove', { itemId: list[0].id });
+  list = await q;
+  assert.equal(list.length, 0);
+
+  // Skip with an empty queue does nothing
+  b.emit('control', { action: 'next' });
+  await sleep(150);
+  assert.equal(rooms.get('QUEUE1').videoId, 'ccccccccccc');
+});
+
+test('queue: when a video ends the next one plays, only once even if everyone reports it', async () => {
+  const a = client();
+  const b = client();
+  await join(a, 'QUEUE2', 'A');
+  await join(b, 'QUEUE2', 'B');
+  await queueAdd(a, { videoId: 'aaaaaaaaaaa', title: 'One' });
+  await queueAdd(a, { videoId: 'bbbbbbbbbbb', title: 'Two' });
+  await queueAdd(a, { videoId: 'ccccccccccc', title: 'Three' });
+
+  const auto = stateFor(b, 'auto-next');
+  a.emit('control', { action: 'ended', videoId: 'aaaaaaaaaaa', position: 200 });
+  b.emit('control', { action: 'ended', videoId: 'aaaaaaaaaaa', position: 200 }); // late duplicate
+  const s = await auto;
+  assert.equal(s.videoId, 'bbbbbbbbbbb');
+  await sleep(150);
+  const r = rooms.get('QUEUE2');
+  assert.equal(r.videoId, 'bbbbbbbbbbb', 'duplicate "ended" must not skip a second video');
+  assert.deepEqual(r.queue.map((i) => i.videoId), ['ccccccccccc']);
+
+  // Play a specific queued item right now
+  const loaded = stateFor(a, 'load');
+  b.emit('queue:play', { itemId: r.queue[0].id });
+  assert.equal((await loaded).videoId, 'ccccccccccc');
+
+  // Last video ends with an empty queue -> pause at the end
+  const ended = stateFor(b, 'ended');
+  a.emit('control', { action: 'ended', videoId: 'ccccccccccc', position: 321 });
+  const e = await ended;
+  assert.equal(e.isPlaying, false);
+  assert.equal(e.position, 321);
+});
+
+test('queue: late joiners get the queue and the current title', async () => {
+  const a = client();
+  await join(a, 'QUEUE3', 'A');
+  await queueAdd(a, { videoId: 'aaaaaaaaaaa', title: 'Now playing' });
+  await queueAdd(a, { videoId: 'bbbbbbbbbbb', title: 'Up next' });
+  const b = client();
+  const res = await join(b, 'QUEUE3', 'B');
+  assert.equal(res.state.title, 'Now playing');
+  assert.equal(res.queue.length, 1);
+  assert.equal(res.queue[0].title, 'Up next');
+});
+
+// ---------------------------------------------------------------------------
+// Search
+// ---------------------------------------------------------------------------
+test('search endpoint: explains when there is no key, and rejects tiny queries', async () => {
+  const saved = process.env.YOUTUBE_API_KEY;
+  delete process.env.YOUTUBE_API_KEY;
+  let r = await fetch(`${url}/api/search?q=a`);
+  assert.equal(r.status, 400);
+  r = await fetch(`${url}/api/search?q=arijit%20singh`);
+  assert.equal(r.status, 503);
+  assert.match((await r.json()).error, /isn’t switched on/);
+  if (saved) process.env.YOUTUBE_API_KEY = saved;
+});
+
+test('youtube.searchVideos: parses results, lengths, entities, and caches', async () => {
+  const yt = require('../youtube.js');
+  let calls = 0;
+  const fakeFetch = async (u) => {
+    calls++;
+    const href = String(u);
+    if (href.includes('/search?')) {
+      assert.ok(href.includes('videoEmbeddable=true'));
+      return new Response(JSON.stringify({
+        items: [
+          { id: { videoId: 'aaaaaaaaaaa' }, snippet: { title: 'Tom &amp; Jerry &#39;s best', channelTitle: 'Cartoon &quot;TV&quot;', thumbnails: { medium: { url: 'https://i.ytimg.com/x.jpg' } }, liveBroadcastContent: 'none' } },
+          { id: { channelId: 'zzz' }, snippet: { title: 'not a video' } },
+        ],
+      }), { status: 200 });
+    }
+    return new Response(JSON.stringify({ items: [{ id: 'aaaaaaaaaaa', contentDetails: { duration: 'PT1H2M3S' } }] }), { status: 200 });
+  };
+  const results = await yt.searchVideos('Tom and Jerry', { fetchImpl: fakeFetch, apiKey: 'test' });
+  assert.equal(results.length, 1);
+  assert.equal(results[0].title, "Tom & Jerry 's best");
+  assert.equal(results[0].channel, 'Cartoon "TV"');
+  assert.equal(results[0].duration, 3723);
+  assert.equal(calls, 2);
+  await yt.searchVideos('  tom AND jerry ', { fetchImpl: fakeFetch, apiKey: 'test' });
+  assert.equal(calls, 2, 'second identical search should come from the cache');
+
+  const quotaFetch = async () => new Response(JSON.stringify({ error: { errors: [{ reason: 'quotaExceeded' }] } }), { status: 403 });
+  await assert.rejects(yt.searchVideos('something new', { fetchImpl: quotaFetch, apiKey: 'test' }), (e) => e.code === 'quota');
+  await assert.rejects(yt.searchVideos('x', { apiKey: '' }), (e) => e.code === 'not_configured');
+});

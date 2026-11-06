@@ -27,7 +27,7 @@ function check(name, ok, detail = '') {
 
 const server = spawn('node', ['server.js'], {
   cwd: ROOT,
-  env: { ...process.env, PORT: String(PORT) },
+  env: { ...process.env, PORT: String(PORT), ZD_OFFLINE: '1' },
   stdio: 'inherit',
 });
 await sleep(800);
@@ -60,6 +60,16 @@ try {
   // --- A creates a room ---
   const A = await person();
   await A.goto(BASE);
+
+  // --- Light / dark mode ---
+  const theme0 = await A.getAttribute('html', 'data-theme');
+  await A.click('#homeView .theme-toggle');
+  const theme1 = await A.getAttribute('html', 'data-theme');
+  check('theme toggle switches light/dark', theme0 !== theme1 && ['light', 'dark'].includes(theme1), `${theme0} -> ${theme1}`);
+  await A.reload();
+  check('chosen theme is remembered', (await A.getAttribute('html', 'data-theme')) === theme1);
+  await A.click('#homeView .theme-toggle'); // back to the original
+
   await A.fill('#nameInput', 'Niyut');
   await A.click('#createBtn');
   await A.waitForSelector('#roomView:not(.hidden)');
@@ -80,7 +90,7 @@ try {
 
   // --- A loads a video ---
   await A.fill('#linkInput', 'https://www.youtube.com/watch?v=M7lc1UVf-VE&t=10s');
-  await A.click('#linkForm button');
+  await A.click('#goBtn');
   await sleep(2500);
   const [sa, sb, ta, tb] = [await st(A), await st(B), await t(A), await t(B)];
   check('both are playing after a link is pasted', sa === PLAYING && sb === PLAYING, `A=${sa} B=${sb}`);
@@ -157,6 +167,40 @@ try {
   await sleep(500);
   check('chat is safe from HTML injection', !(await B.evaluate(() => window.__pwned)));
 
+  // --- Queue: add, skip, auto-play next ---
+  await A.fill('#linkInput', 'https://youtu.be/aaaaaaaaaaa');
+  await A.click('#queueLinkBtn');
+  await sleep(800);
+  const qB = await B.evaluate(() => window.__zd.queue.map((i) => i.videoId));
+  check('queued video shows for everyone', qB.length === 1 && qB[0] === 'aaaaaaaaaaa', qB.join(','));
+  check('Next button appears when something is queued', await B.isVisible('#skipBtn'));
+  await B.click('#tabQueue');
+  check('queue tab lists the video', (await B.$$eval('#queueList li', (els) => els.length)) === 1);
+  await B.click('#skipBtn');
+  await sleep(1500);
+  const [vA, vB] = await Promise.all([A, B].map((p) => p.evaluate(() => window.__fakePlayer.videoId)));
+  check('Next plays the queued video for everyone', vA === 'aaaaaaaaaaa' && vB === 'aaaaaaaaaaa', `A=${vA} B=${vB}`);
+  check('queue is empty after skipping', (await A.evaluate(() => window.__zd.queue.length)) === 0);
+
+  for (const p of [A, B, C]) await p.evaluate(() => { window.__fakeDuration = 5; });
+  await A.fill('#linkInput', 'https://www.youtube.com/watch?v=bbbbbbbbbbb');
+  await A.click('#queueLinkBtn');
+  await sleep(600);
+  await B.fill('#linkInput', 'ccccccccccc');
+  await B.click('#queueLinkBtn');
+  await sleep(600);
+  await A.click('#skipBtn'); // starts bbbbbbbbbbb, which is only 5 seconds long
+  await sleep(8000);
+  const [wA, wB, wC] = await Promise.all([A, B, C].map((p) => p.evaluate(() => window.__fakePlayer.videoId)));
+  check('when a video ends, the next one plays for everyone', [wA, wB, wC].every((v) => v === 'ccccccccccc'), `A=${wA} B=${wB} C=${wC}`);
+  for (const p of [A, B, C]) await p.evaluate(() => { window.__fakeDuration = 600; });
+  const chatAfterQueue = await A.$$eval('#chatList li', (els) => els.map((e) => e.textContent));
+  check('queue activity appears in chat', chatAfterQueue.some((m) => m.includes('added') && m.includes('queue')) && chatAfterQueue.some((m) => m.startsWith('Up next')));
+  await B.click('#tabChat');
+  await A.fill('#linkInput', 'https://www.youtube.com/watch?v=M7lc1UVf-VE');
+  await A.click('#goBtn');
+  await sleep(2000);
+
   // --- Autoplay blocked: D's browser refuses to start until tapped ---
   const D = await person({ width: 390, height: 844 });
   await D.addInitScript(() => { window.__blockAutoplay = true; });
@@ -179,7 +223,7 @@ try {
 
   // --- Bad link ---
   await A.fill('#linkInput', 'hello world');
-  await A.click('#linkForm button');
+  await A.click('#goBtn');
   await sleep(300);
   check('bad link shows a message', (await A.textContent('#toast')).includes("doesn't look like"));
 
@@ -189,8 +233,21 @@ try {
   const H = await person({ width: 390, height: 844 });
   await H.goto(BASE);
   await H.screenshot({ path: path.join(SHOTS, 'home-phone.png') });
-  await B.screenshot({ path: path.join(SHOTS, 'room-phone.png') });
+  await A.fill('#linkInput', 'https://youtu.be/ddddddddddd');
+  await A.click('#queueLinkBtn');
+  await A.fill('#linkInput', 'https://youtu.be/eeeeeeeeeee');
+  await A.click('#queueLinkBtn');
+  await sleep(800);
+  await B.screenshot({ path: path.join(SHOTS, 'room-phone.png'), fullPage: true });
+  await A.click('#tabQueue');
   await A.screenshot({ path: path.join(SHOTS, 'room-desktop.png') });
+  await A.click('#roomView .theme-toggle');
+  await sleep(300);
+  await A.screenshot({ path: path.join(SHOTS, 'room-desktop-other-theme.png') });
+  await A.click('#tabChat');
+  await B.click('#roomView .theme-toggle');
+  await sleep(300);
+  await B.screenshot({ path: path.join(SHOTS, 'room-phone-other-theme.png'), fullPage: true });
 } catch (err) {
   check('test run finished without crashing', false, err.stack);
 } finally {
