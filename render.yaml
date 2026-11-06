@@ -1,0 +1,14 @@
+# Render Blueprint: one free web service that serves the website AND the sync server.
+services:
+  - type: web
+    name: zerodoori
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm ci --omit=dev
+    startCommand: node server.js
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"

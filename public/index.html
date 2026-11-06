@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>ZeroDoori – watch YouTube together</title>
+  <meta name="description" content="Watch YouTube videos in sync with friends who live far away." />
+  <meta name="theme-color" content="#14121a" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="ZeroDoori" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div id="connBanner" class="banner hidden" role="status"></div>
+
+  <!-- ======================= HOME ======================= -->
+  <main id="homeView" class="home">
+    <div class="home-card">
+      <div class="brand">
+        <img src="/icons/icon-192.png" alt="" class="brand-icon" width="56" height="56" />
+        <div>
+          <h1>ZeroDoori</h1>
+          <p class="tagline">Watch YouTube together, at zero distance.</p>
+        </div>
+      </div>
+
+      <label class="field">
+        <span>Your name</span>
+        <input id="nameInput" type="text" maxlength="24" placeholder="e.g. Niyut" autocomplete="nickname" />
+      </label>
+
+      <div id="inviteBox" class="invite hidden">
+        <p>You've been invited to room <strong id="inviteCode"></strong></p>
+        <button id="joinInviteBtn" class="btn primary wide">Join room</button>
+      </div>
+
+      <button id="createBtn" class="btn primary wide">Create a room</button>
+
+      <div class="divider"><span>or join a friend</span></div>
+
+      <div class="join-row">
+        <input id="codeInput" type="text" maxlength="10" placeholder="Room code" autocapitalize="characters" autocomplete="off" spellcheck="false" />
+        <button id="joinBtn" class="btn">Join</button>
+      </div>
+
+      <p id="homeError" class="error" role="alert"></p>
+    </div>
+    <p class="footnote">Each of you streams the video from YouTube; ZeroDoori only keeps you in sync.</p>
+  </main>
+
+  <!-- ======================= ROOM ======================= -->
+  <div id="roomView" class="room hidden">
+    <header class="topbar">
+      <div class="topbar-left">
+        <img src="/icons/icon-192.png" alt="" class="topbar-icon" width="28" height="28" />
+        <span class="room-label">Room</span>
+        <button id="codeChip" class="code-chip" title="Copy invite link"></button>
+      </div>
+      <div class="topbar-right">
+        <button id="inviteBtn" class="btn small primary">Invite</button>
+        <button id="leaveBtn" class="btn small ghost">Leave</button>
+      </div>
+    </header>
+
+    <div class="room-body">
+      <section class="stage">
+        <div class="player-wrap">
+          <div id="player"></div>
+          <div id="emptyOverlay" class="overlay">
+            <p class="overlay-title">Nothing playing yet</p>
+            <p class="overlay-text">Paste a YouTube link below. It starts for everyone in the room.</p>
+          </div>
+          <button id="tapToSync" class="tap-to-sync hidden">Tap to start playing in sync</button>
+        </div>
+
+        <form id="linkForm" class="link-row" autocomplete="off">
+          <input id="linkInput" type="url" inputmode="url" placeholder="Paste a YouTube link" />
+          <button class="btn primary" type="submit">Play</button>
+        </form>
+
+        <div class="now">
+          <p id="nowTitle" class="now-title"></p>
+          <p id="syncStatus" class="sync-status"></p>
+        </div>
+
+        <div class="people">
+          <span class="people-label">Watching</span>
+          <ul id="peopleList" class="people-list"></ul>
+        </div>
+      </section>
+
+      <aside class="chat">
+        <div class="chat-head">Chat</div>
+        <ul id="chatList" class="chat-list" aria-live="polite"></ul>
+        <form id="chatForm" class="chat-form" autocomplete="off">
+          <input id="chatInput" type="text" maxlength="400" placeholder="Say something…" enterkeyhint="send" />
+          <button class="btn primary" type="submit" aria-label="Send">Send</button>
+        </form>
+      </aside>
+    </div>
+  </div>
+
+  <!-- Invite sheet (fallback when the phone can't open the share menu) -->
+  <div id="inviteSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="sheet-card">
+      <h2 id="sheetTitle">Invite a friend</h2>
+      <p>Send them this link, or tell them the room code <strong id="sheetCode"></strong>.</p>
+      <input id="sheetLink" type="text" readonly />
+      <div class="sheet-actions">
+        <button id="copyLinkBtn" class="btn primary">Copy link</button>
+        <a id="whatsappLink" class="btn whatsapp" href="#" target="_blank" rel="noopener">WhatsApp</a>
+        <button id="closeSheetBtn" class="btn ghost">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/app.js"></script>
+  <script src="https://www.youtube.com/iframe_api" async></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "ZeroDoori",
+  "short_name": "ZeroDoori",
+  "description": "Watch YouTube videos in sync with friends far away.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#14121a",
+  "theme_color": "#14121a",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
