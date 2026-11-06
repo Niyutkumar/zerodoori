@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ZeroDoori</string>
+    <string name="title_activity_main">ZeroDoori</string>
+    <string name="package_name">com.niyutkumar.zerodoori</string>
+    <string name="custom_url_scheme">com.niyutkumar.zerodoori</string>
+</resources>

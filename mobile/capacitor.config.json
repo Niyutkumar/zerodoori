@@ -1,0 +1,12 @@
+{
+  "appId": "com.niyutkumar.zerodoori",
+  "appName": "ZeroDoori",
+  "webDir": "www",
+  "server": {
+    "url": "https://zerodoori.onrender.com",
+    "errorPath": "error.html"
+  },
+  "android": {
+    "backgroundColor": "#14121a"
+  }
+}

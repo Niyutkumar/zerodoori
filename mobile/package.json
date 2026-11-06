@@ -1,0 +1,16 @@
+{
+  "name": "zerodoori-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Android app for ZeroDoori (a Capacitor shell that opens the ZeroDoori website).",
+  "scripts": {
+    "sync": "cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.6.0",
+    "@capacitor/core": "8.6.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.0"
+  }
+}
