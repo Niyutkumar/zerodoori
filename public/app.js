@@ -102,6 +102,7 @@
   let roomId = null; // the room we're in (or trying to rejoin)
   let room = null; // last known room truth from the server
   let users = [];
+  let queue = []; // videos waiting to play next (shared by the room)
   let clockOffset = 0; // serverTime - localTime, in ms
 
   let player = null;
@@ -132,6 +133,33 @@
     if (!room) return 0;
     if (!room.isPlaying) return room.position;
     return room.position + ((serverNow() - room.updatedAt) / 1000) * room.rate;
+  }
+
+  // ======================================================================
+  // LIGHT / DARK MODE
+  // ======================================================================
+  // Follows the phone's setting until you pick one with the sun / moon button.
+  const darkQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', theme === 'dark' ? '#0B0D12' : '#F7F7FA');
+  }
+  applyTheme(document.documentElement.getAttribute('data-theme') || 'light');
+
+  document.querySelectorAll('.theme-toggle').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      storage.set('zd-theme', next);
+      applyTheme(next);
+    });
+  });
+  if (darkQuery && darkQuery.addEventListener) {
+    darkQuery.addEventListener('change', (e) => {
+      const saved = storage.get('zd-theme');
+      if (saved !== 'light' && saved !== 'dark') applyTheme(e.matches ? 'dark' : 'light');
+    });
   }
 
   // ======================================================================
@@ -214,6 +242,9 @@
     roomId = null;
     room = null;
     users = [];
+    queue = [];
+    renderQueue();
+    showTab('chat');
     loadedVideoId = null;
     if (player && playerReady) {
       try { player.stopVideo(); } catch (e) { /* ignore */ }
@@ -246,7 +277,7 @@
   function joinCurrentRoom() {
     if (!roomId || !socket.connected) return;
     const seed = room && room.videoId
-      ? { videoId: room.videoId, position: expectedPosition(), rate: room.rate }
+      ? { videoId: room.videoId, title: room.title, position: expectedPosition(), rate: room.rate }
       : null;
     socket.emit('join', { roomId, name: me.name, seed }, (res) => {
       if (!res || !res.ok) {
@@ -259,6 +290,8 @@
       roomId = res.roomId;
       users = res.users;
       renderPeople();
+      queue = res.queue || [];
+      renderQueue();
       $('chatList').innerHTML = '';
       res.chat.forEach(renderChat);
       if (res.isNew && !res.state.videoId) {
@@ -326,7 +359,15 @@
     renderPeople();
   });
 
-  socket.on('chat', (msg) => renderChat(msg));
+  socket.on('chat', (msg) => {
+    renderChat(msg);
+    if (activeTab !== 'chat' && !msg.system) bumpChatBadge();
+  });
+
+  socket.on('queue', (list) => {
+    queue = list;
+    renderQueue();
+  });
 
   socket.on('state', (state) => {
     if (!roomId) return;
@@ -334,6 +375,7 @@
     const previousVideo = room && room.videoId;
     room = {
       videoId: state.videoId,
+      title: state.title || null,
       isPlaying: state.isPlaying,
       position: state.position,
       updatedAt: state.updatedAt,
@@ -350,10 +392,14 @@
   function describeAction(state, mine, previousVideo) {
     const who = mine ? 'You' : state.byName;
     const at = formatTime(state.position);
+    const video = state.title ? `“${shorten(state.title, 60)}”` : 'a new video';
     let text = '';
     let logToChat = true;
     switch (state.action) {
-      case 'load': text = `${who} started a new video`; break;
+      case 'load': text = `${who} started ${video}`; break;
+      case 'next': text = `${who} skipped to ${video}`; break;
+      case 'auto-next': text = `Up next: ${video}`; break;
+      case 'ended': text = 'The video ended'; logToChat = false; break;
       case 'play': text = `${who} pressed play at ${at}`; break;
       case 'pause': text = `${who} paused at ${at}`; break;
       case 'seek': text = `${who} jumped to ${at}`; logToChat = false; break;
@@ -376,22 +422,52 @@
     socket.emit('control', Object.assign({ action, position, at: serverNow() }, extra || {}));
   }
 
-  $('linkForm').addEventListener('submit', (e) => {
-    e.preventDefault();
+  /** Reads the link box. Returns {videoId, start} or null (after telling the user why). */
+  function takeLink() {
     const info = getVideoInfo($('linkInput').value);
     if (!info) {
-      toast("That doesn't look like a YouTube link.");
-      return;
+      toast($('linkInput').value.trim() ? "That doesn't look like a YouTube link." : 'Paste a YouTube link first.');
+      return null;
     }
     if (!socket.connected) {
       toast('Not connected yet – try again in a moment.');
-      return;
+      return null;
     }
     $('linkInput').value = '';
     $('linkInput').blur();
-    // Starting from a user click also unlocks autoplay in the browser.
-    sendControl('load', info.start, { videoId: info.videoId });
+    return info;
+  }
+
+  // Play now (for everyone). Starting from a tap also unlocks autoplay in the browser.
+  $('linkForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const info = takeLink();
+    if (info) sendControl('load', info.start, { videoId: info.videoId });
   });
+
+  // Add to the queue.
+  $('queueLinkBtn').addEventListener('click', () => {
+    const info = takeLink();
+    if (info) addToQueue(info.videoId);
+  });
+
+  function addToQueue(videoId, extra) {
+    socket.emit('queue:add', Object.assign({ videoId }, extra || {}), (res) => {
+      if (!res || !res.ok) {
+        toast((res && res.error) || 'Could not add that video.');
+        return;
+      }
+      if (res.started) {
+        toast('Playing now');
+        return;
+      }
+      toast('Added to the queue');
+      // If the last video already finished, start the queue right away.
+      if (playerReady && player.getPlayerState() === YT_STATE.ENDED) sendControl('next', 0);
+    });
+  }
+
+  $('skipBtn').addEventListener('click', () => sendControl('next', 0));
 
   // ======================================================================
   // YOUTUBE PLAYER
@@ -437,7 +513,7 @@
     if (room.videoId !== loadedVideoId) {
       loadedVideoId = room.videoId;
       suppress(4000);
-      $('nowTitle').textContent = '';
+      $('nowTitle').textContent = room.title || '';
       if (room.isPlaying) {
         player.loadVideoById({ videoId: room.videoId, startSeconds: target });
         scheduleAutoplayCheck();
@@ -482,7 +558,14 @@
       hideTapToSync();
       requestWakeLock();
       const data = player.getVideoData ? player.getVideoData() : null;
-      if (data && data.title) $('nowTitle').textContent = data.title;
+      if (data && data.title) {
+        $('nowTitle').textContent = data.title;
+        // Share the title so late joiners and the activity lines can show it.
+        if (room && !room.title && data.video_id === room.videoId) {
+          room.title = data.title;
+          socket.emit('control', { action: 'title', videoId: room.videoId, title: data.title });
+        }
+      }
     } else if (s === YT_STATE.PAUSED || s === YT_STATE.ENDED) {
       releaseWakeLock();
     }
@@ -496,7 +579,8 @@
     } else if (s === YT_STATE.PAUSED && room.isPlaying) {
       sendControl('pause', player.getCurrentTime());
     } else if (s === YT_STATE.ENDED && room.isPlaying) {
-      sendControl('pause', player.getDuration());
+      // The server plays the next queued video (or pauses if the queue is empty).
+      sendControl('ended', player.getDuration(), { videoId: room.videoId });
     }
   }
 
@@ -668,6 +752,108 @@
   }
   setInterval(updateSyncStatus, 1000);
 
+  function shorten(text, max) {
+    return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+  }
+
+  // ---------- tabs: chat / up next ----------
+  let activeTab = 'chat';
+  let unreadChat = 0;
+
+  function showTab(name) {
+    activeTab = name;
+    const chat = name === 'chat';
+    $('tabChat').classList.toggle('active', chat);
+    $('tabQueue').classList.toggle('active', !chat);
+    $('tabChat').setAttribute('aria-selected', String(chat));
+    $('tabQueue').setAttribute('aria-selected', String(!chat));
+    $('chatPanel').classList.toggle('hidden', !chat);
+    $('queuePanel').classList.toggle('hidden', chat);
+    if (chat) {
+      unreadChat = 0;
+      $('chatBadge').classList.add('hidden');
+      scrollChatToBottom();
+    }
+  }
+  function bumpChatBadge() {
+    unreadChat++;
+    $('chatBadge').textContent = String(unreadChat);
+    $('chatBadge').classList.remove('hidden');
+  }
+  $('tabChat').addEventListener('click', () => showTab('chat'));
+  $('tabQueue').addEventListener('click', () => showTab('queue'));
+
+  // ---------- queue ----------
+  function thumbUrl(videoId) {
+    return `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+  }
+
+  function iconButton(icon, label, onClick) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'icon-btn small';
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
+    btn.innerHTML = `<svg class="ico"><use href="#i-${icon}"/></svg>`;
+    btn.addEventListener('click', onClick);
+    return btn;
+  }
+
+  function renderQueue() {
+    const list = $('queueList');
+    list.innerHTML = '';
+    $('queueCount').textContent = String(queue.length);
+    $('queueEmpty').classList.toggle('hidden', queue.length > 0);
+    $('skipBtn').classList.toggle('hidden', queue.length === 0 || !roomId);
+
+    queue.forEach((item, index) => {
+      const li = document.createElement('li');
+      li.className = 'q-item';
+
+      const num = document.createElement('span');
+      num.className = 'q-num';
+      num.textContent = String(index + 1);
+
+      const thumb = document.createElement('div');
+      thumb.className = 'thumb';
+      const img = document.createElement('img');
+      img.src = thumbUrl(item.videoId);
+      img.alt = '';
+      img.loading = 'lazy';
+      img.addEventListener('error', () => img.remove());
+      thumb.appendChild(img);
+      if (item.duration) {
+        const len = document.createElement('span');
+        len.className = 'len';
+        len.textContent = formatTime(item.duration);
+        thumb.appendChild(len);
+      }
+
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      const t = document.createElement('p');
+      t.className = 't';
+      t.textContent = item.title || 'YouTube video';
+      const sub = document.createElement('p');
+      sub.className = 's';
+      sub.textContent = item.channel ? `${item.channel} · added by ${item.addedBy}` : `Added by ${item.addedBy}`;
+      meta.appendChild(t);
+      meta.appendChild(sub);
+
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+      actions.appendChild(iconButton('play', 'Play now', () => socket.emit('queue:play', { itemId: item.id })));
+      if (index > 0) actions.appendChild(iconButton('up', 'Play next', () => socket.emit('queue:top', { itemId: item.id })));
+      actions.appendChild(iconButton('x', 'Remove from queue', () => socket.emit('queue:remove', { itemId: item.id })));
+
+      li.appendChild(num);
+      li.appendChild(thumb);
+      li.appendChild(meta);
+      li.appendChild(actions);
+      list.appendChild(li);
+    });
+  }
+
   function renderPeople() {
     const list = $('peopleList');
     list.innerHTML = '';
@@ -783,6 +969,7 @@
   // Expose a tiny bit of state for automated tests.
   window.__zd = {
     get room() { return room; },
+    get queue() { return queue; },
     get me() { return me; },
     get clockOffset() { return clockOffset; },
     expectedPosition,

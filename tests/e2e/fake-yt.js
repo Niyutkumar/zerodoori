@@ -4,6 +4,7 @@
 (function () {
   const S = { UNSTARTED: -1, ENDED: 0, PLAYING: 1, PAUSED: 2, BUFFERING: 3, CUED: 5 };
   window.__fakeSpeed = 1; // >1 makes this "device" run fast, to test drift correction
+  window.__fakeDuration = 600; // length of every video loaded from now on
 
   function Player(elId, opts) {
     this.opts = opts;
@@ -12,8 +13,12 @@
     this.baseWall = performance.now();
     this.rate = 1;
     this.videoId = null;
-    this.duration = 600;
+    this.duration = window.__fakeDuration;
     this.events = (opts && opts.events) || {};
+    // Like YouTube: when playback reaches the end, the state becomes ENDED.
+    setInterval(() => {
+      if (this.state === S.PLAYING && this._now() >= this.duration) this._set(S.ENDED);
+    }, 100);
     const el = document.getElementById(elId);
     const iframe = document.createElement('div');
     iframe.id = elId;
@@ -44,6 +49,7 @@
 
   Player.prototype.loadVideoById = function (arg) {
     this.videoId = arg.videoId;
+    this.duration = window.__fakeDuration;
     this.base = arg.startSeconds || 0;
     this.baseWall = performance.now();
     this.state = S.UNSTARTED;
@@ -53,6 +59,7 @@
   };
   Player.prototype.cueVideoById = function (arg) {
     this.videoId = arg.videoId;
+    this.duration = window.__fakeDuration;
     this.base = arg.startSeconds || 0;
     this.baseWall = performance.now();
     this._set(S.CUED);

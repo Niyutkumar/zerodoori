@@ -5,7 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>ZeroDoori – watch YouTube together</title>
   <meta name="description" content="Watch YouTube videos in sync with friends who live far away." />
-  <meta name="theme-color" content="#14121a" />
+  <meta name="theme-color" content="#F7F7FA" />
+  <script>
+    // Pick light or dark before the page paints, so it never flashes the wrong colours.
+    (function () {
+      var saved = null;
+      try { saved = localStorage.getItem('zd-theme'); } catch (e) {}
+      var theme = saved === 'light' || saved === 'dark'
+        ? saved
+        : (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
@@ -14,41 +28,59 @@
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
+  <!-- Small inline icons (stroke follows the text colour) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-skip" viewBox="0 0 24 24"><path d="M5 5l10 7-10 7zM19 5v14"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13"/></symbol>
+    <symbol id="i-leave" viewBox="0 0 24 24"><path d="M15 3h4a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H3"/></symbol>
+  </svg>
+
   <div id="connBanner" class="banner hidden" role="status"></div>
 
   <!-- ======================= HOME ======================= -->
   <main id="homeView" class="home">
-    <div class="home-card">
+    <button class="icon-btn theme-toggle home-theme" type="button" aria-label="Switch light or dark mode">
+      <svg class="ico ico-sun"><use href="#i-sun"/></svg><svg class="ico ico-moon"><use href="#i-moon"/></svg>
+    </button>
+
+    <div class="home-inner">
       <div class="brand">
-        <img src="/icons/icon-192.png" alt="" class="brand-icon" width="56" height="56" />
-        <div>
-          <h1>ZeroDoori</h1>
-          <p class="tagline">Watch YouTube together, at zero distance.</p>
+        <img src="/icons/icon-192.png" alt="" class="brand-icon" width="52" height="52" />
+        <h1>ZeroDoori</h1>
+        <p class="tagline">Watch YouTube together, at zero distance.</p>
+      </div>
+
+      <div class="home-card">
+        <label class="field">
+          <span>Your name</span>
+          <input id="nameInput" type="text" maxlength="24" placeholder="Niyut" autocomplete="nickname" />
+        </label>
+
+        <div id="inviteBox" class="invite hidden">
+          <p>You're invited to room <strong id="inviteCode"></strong></p>
+          <button id="joinInviteBtn" class="btn primary wide" type="button">Join room</button>
         </div>
+
+        <button id="createBtn" class="btn primary wide" type="button">Create a room</button>
+
+        <div class="divider"><span>or join a friend</span></div>
+
+        <div class="join-row">
+          <input id="codeInput" type="text" maxlength="10" placeholder="Room code" autocapitalize="characters" autocomplete="off" spellcheck="false" />
+          <button id="joinBtn" class="btn" type="button">Join</button>
+        </div>
+
+        <p id="homeError" class="error" role="alert"></p>
       </div>
-
-      <label class="field">
-        <span>Your name</span>
-        <input id="nameInput" type="text" maxlength="24" placeholder="e.g. Niyut" autocomplete="nickname" />
-      </label>
-
-      <div id="inviteBox" class="invite hidden">
-        <p>You've been invited to room <strong id="inviteCode"></strong></p>
-        <button id="joinInviteBtn" class="btn primary wide">Join room</button>
-      </div>
-
-      <button id="createBtn" class="btn primary wide">Create a room</button>
-
-      <div class="divider"><span>or join a friend</span></div>
-
-      <div class="join-row">
-        <input id="codeInput" type="text" maxlength="10" placeholder="Room code" autocapitalize="characters" autocomplete="off" spellcheck="false" />
-        <button id="joinBtn" class="btn">Join</button>
-      </div>
-
-      <p id="homeError" class="error" role="alert"></p>
+      <p class="footnote">Everyone streams the video straight from YouTube. ZeroDoori keeps you in sync.</p>
     </div>
-    <p class="footnote">Each of you streams the video from YouTube; ZeroDoori only keeps you in sync.</p>
   </main>
 
   <!-- ======================= ROOM ======================= -->
@@ -56,12 +88,15 @@
     <header class="topbar">
       <div class="topbar-left">
         <img src="/icons/icon-192.png" alt="" class="topbar-icon" width="28" height="28" />
-        <span class="room-label">Room</span>
-        <button id="codeChip" class="code-chip" title="Copy invite link"></button>
+        <span class="wordmark">ZeroDoori</span>
+        <button id="codeChip" class="code-chip" type="button" title="Copy invite link"></button>
       </div>
       <div class="topbar-right">
-        <button id="inviteBtn" class="btn small primary">Invite</button>
-        <button id="leaveBtn" class="btn small ghost">Leave</button>
+        <button class="icon-btn theme-toggle" type="button" aria-label="Switch light or dark mode">
+          <svg class="ico ico-sun"><use href="#i-sun"/></svg><svg class="ico ico-moon"><use href="#i-moon"/></svg>
+        </button>
+        <button id="inviteBtn" class="btn small primary" type="button"><svg class="ico"><use href="#i-share"/></svg><span>Invite</span></button>
+        <button id="leaveBtn" class="icon-btn" type="button" aria-label="Leave room" title="Leave room"><svg class="ico"><use href="#i-leave"/></svg></button>
       </div>
     </header>
 
@@ -71,20 +106,27 @@
           <div id="player"></div>
           <div id="emptyOverlay" class="overlay">
             <p class="overlay-title">Nothing playing yet</p>
-            <p class="overlay-text">Paste a YouTube link below. It starts for everyone in the room.</p>
+            <p class="overlay-text">Paste a YouTube link below and tap Play. It plays for everyone in the room.</p>
           </div>
-          <button id="tapToSync" class="tap-to-sync hidden">Tap to start playing in sync</button>
+          <button id="tapToSync" class="tap-to-sync hidden" type="button">Tap to start playing in sync</button>
         </div>
-
-        <form id="linkForm" class="link-row" autocomplete="off" novalidate>
-          <input id="linkInput" type="url" inputmode="url" placeholder="Paste a YouTube link" />
-          <button class="btn primary" type="submit">Play</button>
-        </form>
 
         <div class="now">
-          <p id="nowTitle" class="now-title"></p>
-          <p id="syncStatus" class="sync-status"></p>
+          <div class="now-text">
+            <p id="nowTitle" class="now-title"></p>
+            <p id="syncStatus" class="sync-status"></p>
+          </div>
+          <button id="skipBtn" class="btn small hidden" type="button" title="Play the next video in the queue">
+            <svg class="ico"><use href="#i-skip"/></svg><span>Next</span>
+          </button>
         </div>
+
+        <form id="linkForm" class="link-bar" autocomplete="off" novalidate>
+          <svg class="ico link-ico"><use href="#i-link"/></svg>
+          <input id="linkInput" type="text" inputmode="url" enterkeyhint="go" placeholder="Paste a YouTube link" />
+          <button id="queueLinkBtn" class="btn small" type="button" title="Add to the queue"><svg class="ico"><use href="#i-plus"/></svg><span>Queue</span></button>
+          <button id="goBtn" class="btn small primary" type="submit" title="Play now for everyone"><svg class="ico ico-fill"><use href="#i-play"/></svg><span>Play</span></button>
+        </form>
 
         <div class="people">
           <span class="people-label">Watching</span>
@@ -92,27 +134,41 @@
         </div>
       </section>
 
-      <aside class="chat">
-        <div class="chat-head">Chat</div>
-        <ul id="chatList" class="chat-list" aria-live="polite"></ul>
-        <form id="chatForm" class="chat-form" autocomplete="off" novalidate>
-          <input id="chatInput" type="text" maxlength="400" placeholder="Say something…" enterkeyhint="send" />
-          <button class="btn primary" type="submit" aria-label="Send">Send</button>
-        </form>
+      <aside class="side">
+        <div class="tabs" role="tablist">
+          <button id="tabChat" class="tab active" role="tab" aria-selected="true" type="button">Chat <span id="chatBadge" class="badge hidden"></span></button>
+          <button id="tabQueue" class="tab" role="tab" aria-selected="false" type="button">Up next <span id="queueCount" class="count">0</span></button>
+        </div>
+
+        <div id="chatPanel" class="panel">
+          <ul id="chatList" class="chat-list" aria-live="polite"></ul>
+          <form id="chatForm" class="chat-form" autocomplete="off" novalidate>
+            <input id="chatInput" type="text" maxlength="400" placeholder="Message" enterkeyhint="send" />
+            <button class="btn small primary" type="submit">Send</button>
+          </form>
+        </div>
+
+        <div id="queuePanel" class="panel hidden">
+          <ul id="queueList" class="queue-list"></ul>
+          <div id="queueEmpty" class="queue-empty">
+            <p class="queue-empty-title">The queue is empty</p>
+            <p>Paste a link and tap <strong>Queue</strong>. Videos play one after another, for everyone.</p>
+          </div>
+        </div>
       </aside>
     </div>
   </div>
 
-  <!-- Invite sheet (fallback when the phone can't open the share menu) -->
+  <!-- Invite sheet (when the phone can't open its share menu) -->
   <div id="inviteSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
     <div class="sheet-card">
       <h2 id="sheetTitle">Invite a friend</h2>
-      <p>Send them this link, or tell them the room code <strong id="sheetCode"></strong>.</p>
+      <p>Send this link, or share the room code <strong id="sheetCode"></strong>.</p>
       <input id="sheetLink" type="text" readonly />
       <div class="sheet-actions">
-        <button id="copyLinkBtn" class="btn primary">Copy link</button>
+        <button id="copyLinkBtn" class="btn primary" type="button">Copy link</button>
         <a id="whatsappLink" class="btn whatsapp" href="#" target="_blank" rel="noopener">WhatsApp</a>
-        <button id="closeSheetBtn" class="btn ghost">Close</button>
+        <button id="closeSheetBtn" class="btn" type="button">Close</button>
       </div>
     </div>
   </div>
