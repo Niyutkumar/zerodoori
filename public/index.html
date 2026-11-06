@@ -76,7 +76,7 @@
           <button id="tapToSync" class="tap-to-sync hidden">Tap to start playing in sync</button>
         </div>
 
-        <form id="linkForm" class="link-row" autocomplete="off">
+        <form id="linkForm" class="link-row" autocomplete="off" novalidate>
           <input id="linkInput" type="url" inputmode="url" placeholder="Paste a YouTube link" />
           <button class="btn primary" type="submit">Play</button>
         </form>
@@ -95,7 +95,7 @@
       <aside class="chat">
         <div class="chat-head">Chat</div>
         <ul id="chatList" class="chat-list" aria-live="polite"></ul>
-        <form id="chatForm" class="chat-form" autocomplete="off">
+        <form id="chatForm" class="chat-form" autocomplete="off" novalidate>
           <input id="chatInput" type="text" maxlength="400" placeholder="Say something…" enterkeyhint="send" />
           <button class="btn primary" type="submit" aria-label="Send">Send</button>
         </form>

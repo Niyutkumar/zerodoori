@@ -47,13 +47,22 @@
     return code;
   }
 
-  /** Pulls the 11-character video id out of any common YouTube link (or a bare id). */
-  function getVideoId(text) {
+  /** "90", "90s", "1m30s", "1h2m3s" -> seconds */
+  function parseStart(value) {
+    if (!value) return 0;
+    if (/^\d+(\.\d+)?s?$/.test(value)) return parseFloat(value);
+    const m = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/.exec(value);
+    if (!m) return 0;
+    return (Number(m[1] || 0) * 3600) + (Number(m[2] || 0) * 60) + Number(m[3] || 0);
+  }
+
+  /** Pulls the video id (and start time, if any) out of any common YouTube link. */
+  function getVideoInfo(text) {
     const value = String(text || '').trim();
-    if (/^[A-Za-z0-9_-]{11}$/.test(value)) return value;
+    if (/^[A-Za-z0-9_-]{11}$/.test(value)) return { videoId: value, start: 0 };
     let url;
     try {
-      url = new URL(value.startsWith('http') ? value : `https://${value}`);
+      url = new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`);
     } catch (e) {
       return null;
     }
@@ -68,7 +77,13 @@
         if (['shorts', 'embed', 'live', 'v'].includes(parts[1])) id = parts[2];
       }
     }
-    return id && /^[A-Za-z0-9_-]{11}$/.test(id) ? id : null;
+    if (!id || !/^[A-Za-z0-9_-]{11}$/.test(id)) return null;
+    return { videoId: id, start: parseStart(url.searchParams.get('t') || url.searchParams.get('start')) };
+  }
+
+  function getVideoId(text) {
+    const info = getVideoInfo(text);
+    return info ? info.videoId : null;
   }
 
   let toastTimer = null;
@@ -93,7 +108,8 @@
   let playerReady = false;
   let ytApiReady = false;
   let loadedVideoId = null;
-  let suppressUntil = 0;
+  let suppressEventsUntil = 0; // ignore player events we caused ourselves (short)
+  let suppressJumpsUntil = 0; // ignore position jumps / drift checks right after we moved the player
   let lastPoll = null;
   let tickCount = 0;
   let autoplayTimer = null;
@@ -101,9 +117,13 @@
   let hasConnectedOnce = false;
 
   const serverNow = () => Date.now() + clockOffset;
-  const isSuppressed = () => Date.now() < suppressUntil;
-  function suppress(ms) {
-    suppressUntil = Math.max(suppressUntil, Date.now() + ms);
+  const eventsSuppressed = () => Date.now() < suppressEventsUntil;
+  const jumpsSuppressed = () => Date.now() < suppressJumpsUntil;
+  /** Call right before WE change the player, so the change isn't mistaken for the user's. */
+  function suppress(jumpMs) {
+    const now = Date.now();
+    suppressEventsUntil = Math.max(suppressEventsUntil, now + 700);
+    suppressJumpsUntil = Math.max(suppressJumpsUntil, now + jumpMs);
     lastPoll = null;
   }
 
@@ -350,13 +370,16 @@
   // ======================================================================
   function sendControl(action, position, extra) {
     if (!roomId || !socket.connected) return;
+    // Give the server a moment to confirm before the drift check second-guesses us.
+    suppressJumpsUntil = Math.max(suppressJumpsUntil, Date.now() + 1500);
+    lastPoll = null;
     socket.emit('control', Object.assign({ action, position, at: serverNow() }, extra || {}));
   }
 
   $('linkForm').addEventListener('submit', (e) => {
     e.preventDefault();
-    const videoId = getVideoId($('linkInput').value);
-    if (!videoId) {
+    const info = getVideoInfo($('linkInput').value);
+    if (!info) {
       toast("That doesn't look like a YouTube link.");
       return;
     }
@@ -367,7 +390,7 @@
     $('linkInput').value = '';
     $('linkInput').blur();
     // Starting from a user click also unlocks autoplay in the browser.
-    sendControl('load', 0, { videoId });
+    sendControl('load', info.start, { videoId: info.videoId });
   });
 
   // ======================================================================
@@ -465,7 +488,7 @@
     }
     updateSyncStatus();
 
-    if (!room || !room.videoId || isSuppressed() || document.hidden) return;
+    if (!room || !room.videoId || eventsSuppressed() || document.hidden) return;
     if (loadedVideoId !== room.videoId) return;
 
     if (s === YT_STATE.PLAYING && !room.isPlaying) {
@@ -478,7 +501,7 @@
   }
 
   function onPlaybackRateChange(event) {
-    if (!room || isSuppressed()) return;
+    if (!room || eventsSuppressed()) return;
     if (event.data !== room.rate) sendControl('rate', player.getCurrentTime(), { rate: event.data });
   }
 
@@ -508,22 +531,37 @@
     const state = player.getPlayerState();
     const stable = state === YT_STATE.PLAYING || state === YT_STATE.PAUSED;
 
-    // 1) Did the user drag the progress bar? (YouTube has no "seek" event, so we watch for jumps.)
-    if (lastPoll && stable && lastPoll.stable && !isSuppressed()) {
-      const dt = (now - lastPoll.wall) / 1000;
-      const predicted = lastPoll.state === YT_STATE.PLAYING ? lastPoll.t + dt * (room.rate || 1) : lastPoll.t;
-      const jump = Math.abs(t - predicted);
-      const limit = state === YT_STATE.PLAYING ? 1.5 : 0.6;
-      if (jump > limit) {
+    // 1) Did the user drag the progress bar? YouTube has no "seek" event, so we compare
+    //    where the video is with where it should be since our last steady reading.
+    //    While buffering, time doesn't move, so we just keep the old reading.
+    if (!stable) {
+      if (lastPoll) lastPoll.wall = now;
+    } else {
+      if (lastPoll && !jumpsSuppressed()) {
+        const dt = (now - lastPoll.wall) / 1000;
+        const predicted = lastPoll.state === YT_STATE.PLAYING ? lastPoll.t + dt * (room.rate || 1) : lastPoll.t;
+        const jump = Math.abs(t - predicted);
+        const limit = lastPoll.state === YT_STATE.PLAYING ? 1.5 : 0.6;
+        if (jump > limit) {
+          sendControl('seek', t);
+          suppress(1200);
+          return;
+        }
+      }
+      lastPoll = { t, wall: now, state };
+
+      // Paused videos don't drift, so being somewhere else means this person moved it
+      // (for example while we were briefly ignoring jumps after someone else's change).
+      if (!jumpsSuppressed() && !room.isPlaying && state === YT_STATE.PAUSED && Math.abs(t - room.position) > 1) {
         sendControl('seek', t);
         suppress(1200);
+        return;
       }
     }
-    lastPoll = { t, wall: now, state, stable };
 
     // 2) Every ~2 seconds, check we're still where the room is.
     tickCount++;
-    if (tickCount % 4 !== 0 || isSuppressed()) return;
+    if (tickCount % 4 !== 0 || jumpsSuppressed()) return;
 
     const target = expectedPosition();
     const duration = player.getDuration ? player.getDuration() : 0;
@@ -749,5 +787,6 @@
     get clockOffset() { return clockOffset; },
     expectedPosition,
     getVideoId,
+    getVideoInfo,
   };
 })();
