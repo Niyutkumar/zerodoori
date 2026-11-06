@@ -6,7 +6,8 @@
   "private": true,
   "scripts": {
     "start": "node server.js",
-    "test": "node --test tests/server.test.js"
+    "test": "node --test tests/server.test.js",
+    "test:e2e": "node tests/e2e/sync.e2e.mjs"
   },
   "engines": {
     "node": ">=20"
@@ -16,6 +17,7 @@
     "socket.io": "^4.8.4"
   },
   "devDependencies": {
-    "socket.io-client": "^4.8.4"
+    "socket.io-client": "^4.8.4",
+    "playwright": "^1.65.0"
   }
 }
