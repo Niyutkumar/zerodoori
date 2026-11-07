@@ -3,8 +3,35 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>ZeroDoori – watch YouTube together</title>
-  <meta name="description" content="Watch YouTube videos in sync with friends who live far away." />
+  <title>ZeroDoori – Watch YouTube together in sync with friends</title>
+  <meta name="description" content="ZeroDoori lets you watch YouTube videos in perfect sync with friends far away. Create a free room, share the link, then play, pause, queue videos and chat together on the web or Android. No sign-up." />
+  <link rel="canonical" href="https://zerodoori.onrender.com/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="ZeroDoori" />
+  <meta property="og:title" content="ZeroDoori – Watch YouTube together in sync" />
+  <meta property="og:description" content="Create a free room, share the link, and watch YouTube videos at the same second with friends anywhere. Chat, shared queue, web and Android." />
+  <meta property="og:url" content="https://zerodoori.onrender.com/" />
+  <meta property="og:image" content="https://zerodoori.onrender.com/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="ZeroDoori: two video screens showing the same moment" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="ZeroDoori – Watch YouTube together in sync" />
+  <meta name="twitter:description" content="Create a free room, share the link, and watch YouTube at the same second with friends anywhere." />
+  <meta name="twitter:image" content="https://zerodoori.onrender.com/og-image.png" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "ZeroDoori",
+    "url": "https://zerodoori.onrender.com/",
+    "description": "Watch YouTube videos in sync with friends far away: shared rooms, synced play, pause and seek, a shared queue and chat.",
+    "applicationCategory": "EntertainmentApplication",
+    "operatingSystem": "Web, Android",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "INR" },
+    "author": { "@type": "Person", "name": "Niyut Shah" }
+  }
+  </script>
   <meta name="theme-color" content="#F7F7FA" />
   <script>
     // Pick light or dark before the page paints, so it never flashes the wrong colours.
@@ -81,6 +108,35 @@
       </div>
       <p class="footnote">Everyone streams the video straight from YouTube. ZeroDoori keeps you in sync.</p>
     </div>
+
+    <section class="about" aria-labelledby="aboutTitle">
+      <h2 id="aboutTitle">Watch YouTube together, wherever you are</h2>
+      <p class="about-lede">ZeroDoori is a free watch party for YouTube. You and your friends each open the same room, and every play, pause, skip and new video happens on everyone's screen at the same second, whether you're in different cities or different countries.</p>
+
+      <ol class="how">
+        <li><strong>Create a room</strong><span>Type your name and tap Create a room. You get a short room code.</span></li>
+        <li><strong>Invite a friend</strong><span>Tap Invite to send the link on WhatsApp, or share the code.</span></li>
+        <li><strong>Press play together</strong><span>Paste a YouTube link. It starts for everyone, and stays in sync.</span></li>
+      </ol>
+
+      <ul class="features">
+        <li><strong>Real sync</strong>Play, pause, skip and speed changes reach everyone, and drifting players fix themselves.</li>
+        <li><strong>Shared queue</strong>Line up the next videos; they play one after another for the whole room.</li>
+        <li><strong>Chat</strong>Talk while you watch, with a note whenever someone pauses or skips.</li>
+        <li><strong>Web and Android</strong>Works in any browser, plus a free Android app. iPhone users can use the website.</li>
+        <li><strong>Light and dark</strong>Follows your phone's setting, or pick one yourself.</li>
+        <li><strong>Free, no sign-up</strong>No account, no ads. Just a name and a room code.</li>
+      </ul>
+
+      <h3>Questions</h3>
+      <details class="faq"><summary>Is ZeroDoori free?</summary><p>Yes. There are no fees, ads or accounts.</p></details>
+      <details class="faq"><summary>Does ZeroDoori stream the video?</summary><p>No. Each person's player streams the video directly from YouTube. ZeroDoori only sends tiny messages like "pause at 1:05" so everyone stays together.</p></details>
+      <details class="faq"><summary>Why won't some videos play?</summary><p>Some uploaders don't allow their videos to play outside YouTube. ZeroDoori tells you when that happens, so you can pick another video.</p></details>
+      <details class="faq"><summary>Is there an app?</summary><p>Yes, for Android: <a href="https://github.com/Niyutkumar/zerodoori/releases/latest/download/ZeroDoori.apk">download ZeroDoori.apk</a>. On iPhone, open this website in Safari and choose Share, then Add to Home Screen.</p></details>
+      <details class="faq"><summary>Why does it sometimes take a minute to open?</summary><p>ZeroDoori runs on a free server that sleeps when nobody is using it. The first visit wakes it up; after that it's quick.</p></details>
+
+      <p class="made">Made by Niyut Shah · <a href="https://github.com/Niyutkumar/zerodoori">Source code on GitHub</a></p>
+    </section>
   </main>
 
   <!-- ======================= ROOM ======================= -->
@@ -175,7 +231,7 @@
 
   <div id="toast" class="toast hidden" role="status"></div>
 
-  <script src="/socket.io/socket.io.js"></script>
+  <script src="/socket.io/socket.io.min.js"></script>
   <script src="/app.js"></script>
   <script src="https://www.youtube.com/iframe_api" async></script>
 </body>

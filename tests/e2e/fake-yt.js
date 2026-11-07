@@ -77,7 +77,9 @@
     const startsPlaying = this.state === S.CUED || this.state === S.UNSTARTED;
     this.base = Math.max(0, Math.min(t, this.duration));
     this.baseWall = performance.now();
-    if (wasPlaying || startsPlaying) this._playSoon();
+    if (wasPlaying) this._playSoon();
+    // Seeking a video that hasn't started tries to play it, which a blocking browser refuses too.
+    else if (startsPlaying && !window.__blockAutoplay) this._playSoon();
   };
   Player.prototype.getCurrentTime = function () { return this._now(); };
   Player.prototype.getPlayerState = function () { return this.state; };

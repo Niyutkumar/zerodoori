@@ -11,6 +11,7 @@ const path = require('path');
 const http = require('http');
 const crypto = require('crypto');
 const express = require('express');
+const compression = require('compression');
 const { Server } = require('socket.io');
 const youtube = require('./youtube');
 
@@ -130,6 +131,8 @@ function quoted(title) {
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1); // Render sits in front of us; use the visitor's real IP for rate limits
+
+app.use(compression()); // gzip pages and scripts: about 4x less data per visit
 
 app.get('/health', (req, res) => {
   res.json({ ok: true, rooms: rooms.size, search: Boolean(process.env.YOUTUBE_API_KEY), time: Date.now() });

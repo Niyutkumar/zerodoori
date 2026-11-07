@@ -187,9 +187,9 @@ input::placeholder { color: var(--faint); }
   position: relative;
   min-height: 100%;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: calc(32px + var(--safe-top)) 20px calc(32px + var(--safe-bottom));
+  padding: calc(56px + var(--safe-top)) 20px calc(40px + var(--safe-bottom));
 }
 .home-theme { position: absolute; top: calc(14px + var(--safe-top)); right: 14px; }
 .home-inner { width: 100%; max-width: 400px; }
@@ -225,6 +225,33 @@ input::placeholder { color: var(--faint); }
 .error { margin: -4px 0 0; color: var(--danger); font-size: 13.5px; }
 .error:empty { display: none; }
 .footnote { text-align: center; color: var(--faint); font-size: 12.5px; margin: 18px 8px 0; }
+
+/* ---------- about (home, below the card) ---------- */
+.about { width: 100%; max-width: 760px; margin-top: 72px; }
+.about h2 { font-size: 26px; font-weight: 700; letter-spacing: -.5px; margin: 0 0 10px; text-align: center; text-wrap: balance; }
+.about-lede { color: var(--muted); text-align: center; max-width: 620px; margin: 0 auto 28px; font-size: 15.5px; }
+.how { list-style: none; counter-reset: how; padding: 0; margin: 0 0 28px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.how li { counter-increment: how; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+.how li::before {
+  content: counter(how); display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); color: var(--accent-text);
+  font-weight: 700; font-size: 13px; margin-bottom: 8px;
+}
+.how strong { display: block; margin-bottom: 2px; }
+.how span { color: var(--muted); font-size: 14px; }
+.features { list-style: none; padding: 0; margin: 0 0 32px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 24px; }
+.features li { color: var(--muted); font-size: 14px; padding-left: 14px; border-left: 2px solid var(--accent-soft); }
+.features strong { display: block; color: var(--text); font-size: 14.5px; }
+.about h3 { font-size: 17px; margin: 0 0 8px; }
+.faq { border-top: 1px solid var(--line); padding: 2px 0; }
+.faq:last-of-type { border-bottom: 1px solid var(--line); }
+.faq summary { cursor: pointer; padding: 12px 0; font-weight: 600; font-size: 14.5px; }
+.faq p { margin: 0 0 12px; color: var(--muted); font-size: 14px; }
+.made { text-align: center; color: var(--faint); font-size: 12.5px; margin-top: 28px; }
+@media (max-width: 640px) {
+  .how, .features { grid-template-columns: 1fr; }
+  .about { margin-top: 48px; }
+}
 
 /* ---------- room ---------- */
 .room { min-height: 100%; display: flex; flex-direction: column; }
