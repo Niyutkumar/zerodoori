@@ -524,4 +524,16 @@ if (require.main === module) {
   });
 }
 
+// Keep the free Render instance awake. Render puts a free service to sleep
+// after 15 minutes without visitors, and while it sleeps Google is told
+// "Disallow" for robots.txt. Visiting our own public address every 10 minutes
+// counts as a visitor. RENDER_EXTERNAL_URL is set by Render only, so this does
+// nothing on a laptop or in tests.
+const SELF_URL = process.env.RENDER_EXTERNAL_URL;
+if (SELF_URL && require.main === module) {
+  setInterval(() => {
+    fetch(`${SELF_URL}/health`).catch(() => {});
+  }, 10 * 60 * 1000).unref();
+}
+
 module.exports = { server, io, rooms, app };

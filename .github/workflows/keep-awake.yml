@@ -1,0 +1,22 @@
+# Backup for the keep-awake code in server.js.
+# The server keeps itself awake, but if Render ever puts it to sleep anyway,
+# a sleeping server can't wake itself. This visits the site every 10 minutes
+# (GitHub may run it late sometimes, which is fine for a backup) so it wakes
+# up again on its own.
+name: Keep ZeroDoori awake
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Visit the site
+        run: |
+          curl -sS --max-time 150 --retry 2 --retry-delay 20 \
+            -o /dev/null -w "HTTP %{http_code} in %{time_total}s\n" \
+            https://zerodoori.onrender.com/health || true
